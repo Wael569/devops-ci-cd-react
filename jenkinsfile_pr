@@ -25,7 +25,8 @@ pipeline {
         stage('Run Container') {
             steps {
                 bat 'docker run -d --name react-pr -p 80:80 react-app-pr'
-                bat 'cmd /c timeout /t 5 /nobreak'
+                sleep time: 5, unit: 'SECONDS'
+
 
             }
         }
