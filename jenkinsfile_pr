@@ -24,6 +24,8 @@ pipeline {
 
         stage('Run Container') {
             steps {
+		// Delete old container safely
+        	bat 'docker rm -f react-pr || exit 0'
                 bat 'docker run -d --name react-pr -p 80:80 react-app-pr'
                 sleep time: 5, unit: 'SECONDS'
 
