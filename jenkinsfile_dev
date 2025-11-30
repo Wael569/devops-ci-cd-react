@@ -33,7 +33,7 @@ pipeline {
 
 
         stage('Smoke Test') {
-            steps { bat 'smoke-test.bat' }
+            steps { bat 'smoke_test.bat' }
         }
 
         stage('Archive') {
