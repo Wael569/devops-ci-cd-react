@@ -21,15 +21,19 @@ pipeline {
         stage('Get version from tag') {
             steps {
                 script {
-                    // Si env.GIT_TAG_NAME est vide, utiliser 'latest'
-                    VERSION = env.GIT_TAG_NAME ?: 'latest'
+                    // VERSION est une variable locale du script
+                    def VERSION = env.GIT_TAG_NAME ?: 'latest'
                     echo "Using version: ${VERSION}"
+
+                    // Stocke VERSION dans env pour qu'il soit disponible dans les prochains stages
+                    env.VERSION = VERSION
                 }
             }
         }
 
         stage('Docker Build') {
             steps {
+                // Utiliser env.VERSION pour bat
                 bat "docker build -t %DOCKER_USER%/react-app:%VERSION% ."
             }
         }
