@@ -1,0 +1,45 @@
+pipeline {
+    agent any
+
+    stages {
+        stage('Checkout') { steps { checkout scm } }
+
+        stage('Docker Build :latest') {
+            steps {
+                bat 'docker build -t YOUR_DOCKER_USER/react-app:latest .'
+            }
+        }
+
+        stage('Push to DockerHub') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'dockerhub', 
+                  usernameVariable: 'USER', passwordVariable: 'PASS')]) {
+
+                    bat 'docker login -u %USER% -p %PASS%'
+                    bat 'docker push YOUR_DOCKER_USER/react-app:latest'
+                }
+            }
+        }
+
+        stage('Run') {
+            steps {
+                bat 'docker run -d --name react-latest -p 80:80 YOUR_DOCKER_USER/react-app:latest'
+                bat 'timeout /t 5'
+            }
+        }
+
+        stage('Smoke Test') {
+            steps { bat 'smoke-test.bat' }
+        }
+
+        stage('Archive') {
+            steps { archiveArtifacts 'build/**' }
+        }
+    }
+
+    post {
+        always {
+            bat 'docker rm -f react-latest || exit 0'
+        }
+    }
+}

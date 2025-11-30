@@ -1,0 +1,39 @@
+pipeline {
+    agent any
+
+    stages {
+
+        stage('Checkout') {
+            steps { checkout scm }
+        }
+
+        stage('Get version from tag') {
+            steps {
+                script {
+                    VERSION = env.GIT_TAG_NAME
+                }
+            }
+        }
+
+        stage('Docker Build') {
+            steps {
+                bat "docker build -t YOUR_DOCKER_USER/react-app:%VERSION% ."
+            }
+        }
+
+        stage('Push Docker Image') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'dockerhub', 
+                 usernameVariable: 'USER', passwordVariable: 'PASS')]) {
+
+                    bat "docker login -u %USER% -p %PASS%"
+                    bat "docker push YOUR_DOCKER_USER/react-app:%VERSION%"
+                }
+            }
+        }
+
+        stage('Archive') {
+            steps { archiveArtifacts 'build/**' }
+        }
+    }
+}
