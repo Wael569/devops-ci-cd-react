@@ -11,28 +11,13 @@ pipeline {
             steps {
                 bat 'npm install'
                 bat 'npm run build'   // creates dist/
-            }
-        }
-
-        stage('Archive') {
-            steps { 
-                archiveArtifacts 'dist/**' 
+                bat 'echo Build completed > artifacts\\build.log'
             }
         }
 
         stage('Docker Build :latest') {
             steps {
-                bat 'docker build -t wael75613/react-app:latest .'
-            }
-        }
-
-        stage('Push to DockerHub') {
-            steps {
-                withCredentials([usernamePassword(credentialsId: 'dockerhub', 
-                  usernameVariable: 'USER', passwordVariable: 'PASS')]) {
-                    bat 'docker login -u %USER% -p %PASS%'
-                    bat 'docker push wael75613/react-app:latest'
-                }
+                bat 'docker build -t wael75613/react-app:latest . > artifacts\\docker-build.log 2>&1'
             }
         }
 
@@ -40,13 +25,31 @@ pipeline {
             steps {
                 bat 'docker rm -f react-latest || exit 0'
                 bat 'docker run -d --name react-latest -p 80:80 wael75613/react-app:latest'
+                bat 'docker logs react-latest > artifacts\\container.log'
                 sleep time: 5, unit: 'SECONDS'
             }
         }
 
         stage('Smoke Test') {
             steps { 
-                bat 'smoke_test.bat' 
+                bat 'smoke_test.bat > artifacts\\smoke.log'
+            }
+        }
+
+        stage('Archive') {
+            steps { 
+                archiveArtifacts artifacts: 'artifacts/**/*'
+            }
+        }
+
+        stage('Push to DockerHub') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'dockerhub', 
+                    usernameVariable: 'USER', passwordVariable: 'PASS')]) {
+
+                    bat 'docker login -u %USER% -p %PASS%'
+                    bat 'docker push wael75613/react-app:latest'
+                }
             }
         }
     }
