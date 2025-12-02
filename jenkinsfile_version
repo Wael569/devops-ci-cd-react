@@ -2,54 +2,95 @@ pipeline {
     agent any
 
     environment {
-        DOCKER_USER = 'wael75613' // ton DockerHub username
+        DOCKER_USER = 'wael75613' // DockerHub username
     }
 
     stages {
 
+        // 1️⃣ Checkout Stage
         stage('Checkout') {
-            steps { checkout scm }
+            steps {
+                echo "Checking out source code..."
+                checkout scm
+            }
         }
 
-        stage('Build ReactJS') {
+        // 2️⃣ Setup Stage
+        stage('Setup') {
             steps {
+                echo "Installing npm dependencies..."
                 bat 'npm install'
+            }
+        }
+
+        // 3️⃣ Build Stage
+        stage('Build') {
+            steps {
+                echo "Building React app..."
                 bat 'npm run build'
             }
         }
 
-        stage('Get version from tag') {
+        // 4️⃣ Run Docker Stage
+        stage('Run Docker') {
             steps {
                 script {
-                    // VERSION est une variable locale du script
+                    // Use Git tag as version or default to 'latest'
                     def VERSION = env.GIT_TAG_NAME ?: 'latest'
-                    echo "Using version: ${VERSION}"
-
-                    // Stocke VERSION dans env pour qu'il soit disponible dans les prochains stages
+                    echo "Using Docker version: ${VERSION}"
                     env.VERSION = VERSION
                 }
+
+                echo "Removing existing container if exists..."
+                bat 'docker rm -f react-app || echo "No container to remove"'
+
+                echo "Building Docker image..."
+                bat "docker build -t %DOCKER_USER%/react-app:${env.VERSION} ."
+
+                echo "Running Docker container..."
+                bat "docker run -d --name react-app -p 80:80 %DOCKER_USER%/react-app:${env.VERSION}"
+
+                echo "Waiting for container to start..."
+                sleep time: 10, unit: 'SECONDS'
+
+                bat 'docker ps'
             }
         }
 
-        stage('Docker Build') {
+        // 5️⃣ Smoke Test Stage
+        stage('Smoke Test') {
             steps {
-                // Utiliser env.VERSION pour bat
-                bat "docker build -t %DOCKER_USER%/react-app:%VERSION% ."
+                echo "Running smoke tests..."
+                bat 'smoke_test.bat'
             }
         }
 
+        // 6️⃣ Archive Stage
+        stage('Archive') {
+            steps {
+                echo "Archiving build artifacts..."
+                archiveArtifacts 'build/**'
+            }
+        }
+
+        // 7️⃣ Push Docker Image (only for tags)
         stage('Push Docker Image') {
+            when { expression { env.GIT_TAG_NAME != null } }
             steps {
-                withCredentials([usernamePassword(credentialsId: 'dockerhub', 
-                 usernameVariable: 'USER', passwordVariable: 'PASS')]) {
+                echo "Pushing Docker image for tag ${env.VERSION}..."
+                withCredentials([usernamePassword(credentialsId: 'dockerhub', usernameVariable: 'USER', passwordVariable: 'PASS')]) {
                     bat "docker login -u %USER% -p %PASS%"
-                    bat "docker push %DOCKER_USER%/react-app:%VERSION%"
+                    bat "docker push %DOCKER_USER%/react-app:${env.VERSION}"
+                    bat "docker logout"
                 }
             }
         }
+    }
 
-        stage('Archive') {
-            steps { archiveArtifacts 'dist/**' }
+    post {
+        always {
+            echo "Cleaning up Docker container..."
+            bat 'docker rm -f react-app || echo "No container to remove"'
         }
     }
 }
